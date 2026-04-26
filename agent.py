@@ -61,7 +61,7 @@ def run_agent(user_prompt):
                 {"role": "user", "content": user_prompt}
             ],
             # এখানে লেটেস্ট মডেলটি বসানো হয়েছে
-            model="llama-3.3-70b-versatile",
+           model="llama3-8b-8192",
             temperature=0.5,
         )
         final_answer = chat_completion.choices[0].message.content
