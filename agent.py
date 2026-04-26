@@ -4,7 +4,7 @@ from supabase import create_client, Client
 from duckduckgo_search import DDGS
 from dotenv import load_dotenv
 
-# এনভায়রনমেন্ট ভেরিয়েবল লোড করা হচ্ছে
+ে
 load_dotenv()
 
 # এপিআই কীগুলো (API Keys) সেটআপ করা
