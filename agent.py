@@ -2,22 +2,28 @@ import os
 import sys
 import threading
 import requests
+import re
 from bs4 import BeautifulSoup
 from flask import Flask
 from groq import Groq
-from supabase import create_client, Client
+from supabase import create_client
 from ddgs import DDGS
 from dotenv import load_dotenv
 import telebot
 
 load_dotenv()
 
-# API Keys
+# Configuration & Security Check
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
+if not all([GROQ_API_KEY, TELEGRAM_BOT_TOKEN]):
+    print("❌ Critical Error: Environment Variables are missing!")
+    sys.exit(1)
+
+# Initialize Clients
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 groq_client = Groq(api_key=GROQ_API_KEY)
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
@@ -25,67 +31,72 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABAS
 app = Flask(__name__)
 
 @app.route('/')
-def home(): return "SEO AI Agent is Live!"
+def home(): return "Professional SEO Engine is Online."
 
-# --- টুলস: ওয়েব স্ক্র্যাপার এবং এসইও অ্যানালাইজার ---
-def seo_scraper_tool(url):
+# --- Advanced Tools ---
+def get_web_content(url):
     try:
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, timeout=10)
-        soup = BeautifulSoup(response.text, 'html.parser')
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        res = requests.get(url, headers=headers, timeout=15)
+        soup = BeautifulSoup(res.text, 'html.parser')
         
-        title = soup.title.string if soup.title else "No Title"
-        meta_desc = soup.find('meta', attrs={'name': 'description'})
-        desc = meta_desc['content'] if meta_desc else "No Meta Description"
-        h1s = [h1.get_text() for h1 in soup.find_all('h1')]
+        # Extract metadata
+        title = soup.title.string if soup.title else "N/A"
+        desc = soup.find('meta', attrs={'name': 'description'})
+        desc = desc['content'] if desc else "N/A"
+        emails = list(set(re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', res.text)))
         
-        return f"URL: {url}\nTitle: {title}\nDescription: {desc}\nH1 Tags: {h1s}"
-    except Exception as e:
-        return f"Error scraping URL: {e}"
+        return f"Source: {url}\nTitle: {title}\nMeta Description: {desc}\nEmails Found: {emails}\n"
+    except: return "Could not retrieve data from URL."
 
-def web_search_tool(query):
+def professional_search(query):
     try:
-        results = DDGS().text(query, max_results=3)
-        return "\n\n".join([f"Title: {item.get('title')}\nSnippet: {item.get('body')}" for item in results])
-    except Exception:
-        return "No search data found."
+        results = DDGS().text(query, max_results=5)
+        return "\n\n".join([f"Info: {r['body']}\nLink: {r['href']}" for r in results])
+    except: return "Search unavailable at the moment."
 
-# --- মূল এজেন্ট লজিক ---
-def run_agent(user_prompt):
-    # যদি মেসেজে কোনো URL থাকে, তবে স্ক্র্যাপার একটিভ হবে
-    scrape_context = ""
-    if "http" in user_prompt:
-        url = [word for word in user_prompt.split() if "http" in word][0]
-        scrape_context = seo_scraper_tool(url)
+# --- Agent Brain ---
+def run_professional_agent(user_prompt):
+    # Context gathering
+    url_match = re.search(r'(https?://\S+)', user_prompt)
+    web_context = get_web_content(url_match.group(0)) if url_match else ""
+    search_context = professional_search(user_prompt)
+
+    system_message = f"""You are 'Biplob's SEO Engine', a highly sophisticated AI developed for Md Biplob Hossen.
+    Your owner: Md Biplob Hossen (SEO Expert & Web Developer).
     
-    search_context = web_search_tool(user_prompt)
+    Guidelines:
+    1. Strictly Professional: Use a formal, corporate tone. No informal chatting.
+    2. Data-Driven: Base answers on the provided context. If data is missing, state it clearly.
+    3. Lead Generation: If a YouTube/Website link is found, prioritize extracting contact info and SEO metrics.
+    4. Signature: Always end with your owner's professional signature.
     
-    system_prompt = f"""You are a professional SEO Expert and Web Developer AI Assistant. 
-    Your owner is Md Biplob Hossen. 
-    If a URL is provided, analyze its SEO based on this data: {scrape_context}
-    Use this search data if needed: {search_context}
-    Always provide professional, actionable SEO and Web Dev advice."""
+    Context Data:
+    {web_context}
+    {search_context}
+    """
     
     try:
-        chat_completion = groq_client.chat.completions.create(
-            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+        response = groq_client.chat.completions.create(
+            messages=[{"role": "system", "content": system_message}, {"role": "user", "content": user_prompt}],
             model="llama-3.3-70b-versatile",
-            temperature=0.5,
+            temperature=0.3, # Lower temperature for more factual and less 'creative' answers
         )
-        return chat_completion.choices[0].message.content
+        answer = response.choices[0].message.content
+        return f"{answer}\n\n---\n**Md Biplob Hossen**\n*SEO Expert & Web Developer*"
     except Exception as e:
-        return f"Error: {e}"
+        return f"Technical Error: {str(e)}"
 
-# --- টেলিগ্রাম হ্যান্ডলার ---
+# --- Telegram Handlers ---
 @bot.message_handler(commands=['start'])
-def send_welcome(message):
-    bot.reply_to(message, "হ্যালো! আমি বিপ্লবের এসইও এবং ওয়েব দেব এজেন্ট। কোনো ওয়েবসাইটের লিংক দিন, আমি সেটির এসইও অডিট করে দিচ্ছি।")
+def welcome(message):
+    bot.reply_to(message, "গোপন সোর্স এবং এআই ডাটাবেসে আপনাকে স্বাগতম, বিপ্লব। আমি আপনার প্রফেশনাল এসইও এবং লিড জেনারেশন ইঞ্জিন। যেকোনো প্রজেক্ট বা লিংক দিয়ে আমাকে কমান্ড দিন।")
 
 @bot.message_handler(func=lambda message: True)
-def handle_user_message(message):
-    msg = bot.reply_to(message, "⏳ এনালাইসিস করছি...")
-    answer = run_agent(message.text)
-    bot.edit_message_text(chat_id=message.chat.id, message_id=msg.message_id, text=answer)
+def handle(message):
+    status_msg = bot.reply_to(message, "⏳ প্রফেশনাল ডাটা এনালাইসিস চলছে...")
+    final_output = run_professional_agent(message.text)
+    bot.edit_message_text(chat_id=message.chat.id, message_id=status_msg.message_id, text=final_output, parse_mode="Markdown")
 
 if __name__ == "__main__":
     threading.Thread(target=lambda: app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))).start()
