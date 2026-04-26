@@ -2,3 +2,5 @@ google-genai
 supabase
 ddgs
 python-dotenv
+pyTelegramBotAPI
+flask
