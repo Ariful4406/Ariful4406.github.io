@@ -1,5 +1,5 @@
 import os
-import google.generativeai as genai
+from google import genai
 from supabase import create_client, Client
 from duckduckgo_search import DDGS
 from dotenv import load_dotenv
@@ -14,9 +14,14 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 # Initialize Clients
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+    gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+else:
+    gemini_client = None
+
 if SUPABASE_URL and SUPABASE_KEY:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+else:
+    supabase = None
 
 def web_search_tool(query):
     """Free Web Search using DuckDuckGo"""
@@ -33,7 +38,7 @@ def web_search_tool(query):
 
 def save_to_memory(user_input, bot_output):
     """Save to Supabase Database"""
-    if not SUPABASE_URL or not SUPABASE_KEY:
+    if not supabase:
         print("Supabase keys missing. Skipping memory save.")
         return
         
@@ -51,8 +56,6 @@ def run_agent(user_prompt):
     """Main Agent Logic"""
     context = web_search_tool(user_prompt)
     
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    
     full_prompt = f"""
     You are a professional AI Agent.
     User Question: {user_prompt}
@@ -64,8 +67,15 @@ def run_agent(user_prompt):
     """
     
     print("Agent is generating response...")
-    response = model.generate_content(full_prompt)
-    final_answer = response.text
+    if gemini_client:
+        # Using the updated Google GenAI SDK syntax
+        response = gemini_client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=full_prompt
+        )
+        final_answer = response.text
+    else:
+        final_answer = "Error: Gemini API Key missing or incorrect."
     
     save_to_memory(user_prompt, final_answer)
     
