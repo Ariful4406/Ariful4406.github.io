@@ -1,4 +1,4 @@
-google-generativeai
+google-genai
 supabase
 duckduckgo-search
 python-dotenv
