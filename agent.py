@@ -1,30 +1,30 @@
 import os
 from google import genai
 from supabase import create_client, Client
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 from dotenv import load_dotenv
 
-# Load Environment Variables
+# এনভায়রনমেন্ট ভেরিয়েবল লোড করা
 load_dotenv()
 
-# Setup API Keys
+# API Keys
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-# Initialize Clients
+# ক্লায়েন্ট ইনিশিয়ালাইজ করা
 if GEMINI_API_KEY:
     gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 else:
     gemini_client = None
 
 if SUPABASE_URL and SUPABASE_KEY:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 else:
     supabase = None
 
 def web_search_tool(query):
-    """Free Web Search using DuckDuckGo"""
+    """DuckDuckGo ব্যবহার করে ফ্রি ইন্টারনেট সার্চ"""
     print(f"Searching internet for: {query}...")
     try:
         results = DDGS().text(query, max_results=3)
@@ -37,7 +37,7 @@ def web_search_tool(query):
         return "No recent data found."
 
 def save_to_memory(user_input, bot_output):
-    """Save to Supabase Database"""
+    """সুপাবেস ডাটাবেসে সেভ করা"""
     if not supabase:
         print("Supabase keys missing. Skipping memory save.")
         return
@@ -53,7 +53,7 @@ def save_to_memory(user_input, bot_output):
         print(f"Memory saving failed: {e}")
 
 def run_agent(user_prompt):
-    """Main Agent Logic"""
+    """মূল এজেন্টের লজিক"""
     context = web_search_tool(user_prompt)
     
     full_prompt = f"""
@@ -68,12 +68,15 @@ def run_agent(user_prompt):
     
     print("Agent is generating response...")
     if gemini_client:
-        # Using the updated Google GenAI SDK syntax
-        response = gemini_client.models.generate_content(
-            model='gemini-1.5-flash',
-            contents=full_prompt
-        )
-        final_answer = response.text
+        try:
+            # গুগলের নতুন মডেল gemini-2.5-flash ব্যবহার করা হচ্ছে
+            response = gemini_client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=full_prompt
+            )
+            final_answer = response.text
+        except Exception as e:
+            final_answer = f"Error generating content: {e}"
     else:
         final_answer = "Error: Gemini API Key missing or incorrect."
     
