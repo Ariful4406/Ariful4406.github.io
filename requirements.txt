@@ -1,1 +1,5 @@
 
+google-generativeai
+supabase
+apify-client
+python-dotenv
