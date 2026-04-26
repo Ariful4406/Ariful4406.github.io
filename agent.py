@@ -1,44 +1,47 @@
 import os
 import threading
 from flask import Flask
-from google import genai
+from groq import Groq
 from supabase import create_client, Client
 from ddgs import DDGS
 from dotenv import load_dotenv
 import telebot
 
-# এনভায়রনমেন্ট ভেরিয়েবল লোড করা
+# Environment Variables
 load_dotenv()
 
 # API Keys
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
-# ক্লায়েন্ট ইনিশিয়ালাইজ করা
-if GEMINI_API_KEY:
-    gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+# Initialize Clients
+if GROQ_API_KEY:
+    groq_client = Groq(api_key=GROQ_API_KEY)
+else:
+    groq_client = None
+
 if SUPABASE_URL and SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 else:
     supabase = None
 
-# টেলিগ্রাম বট ইনিশিয়ালাইজ করা
+# Telegram Bot
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
-# Render-কে সন্তুষ্ট রাখার জন্য একটি ডামি Flask সার্ভার
+# Flask Server (Render কে জাগিয়ে রাখার জন্য)
 app = Flask(__name__)
 @app.route('/')
 def home():
-    return "AI Agent is Running and Connected to Telegram!"
+    return "Llama-3 Agent is Running super fast with Groq!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
 
 def web_search_tool(query):
-    """DuckDuckGo ব্যবহার করে ইন্টারনেট সার্চ"""
+    """ফ্রিতে ইন্টারনেট সার্চ"""
     try:
         results = DDGS().text(query, max_results=3)
         search_results = []
@@ -49,65 +52,56 @@ def web_search_tool(query):
         return "No recent data found."
 
 def save_to_memory(user_input, bot_output):
-    """সুপাবেস ডাটাবেসে সেভ করা"""
     if not supabase: return
     data = {"user_query": user_input, "agent_response": bot_output}
     try:
         supabase.table("agent_memory").insert(data).execute()
-    except Exception as e:
-        print(f"Memory saving failed: {e}")
+    except Exception:
+        pass
 
 def run_agent(user_prompt):
-    """এজেন্টের মূল লজিক"""
     context = web_search_tool(user_prompt)
     
-    full_prompt = f"""
-    You are a professional AI Assistant.
-    User Question: {user_prompt}
+    system_prompt = f"""You are a professional AI Assistant. Answer the user's question clearly. 
+    If the question needs current info, use the following internet data: \n{context}"""
     
-    Latest Information from Internet:
-    {context}
-    
-    Please provide a helpful, detailed, and expert answer based on the above info.
-    """
-    
-    if gemini_client:
+    if groq_client:
         try:
-            response = gemini_client.models.generate_content(
-                model='gemini-2.0-flash',
-                contents=full_prompt
+            # Llama-3 এর সবচেয়ে পাওয়ারফুল মডেলটি ব্যবহার করা হচ্ছে
+            chat_completion = groq_client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                model="llama3-70b-8192",
+                temperature=0.5,
             )
-            final_answer = response.text
+            final_answer = chat_completion.choices[0].message.content
         except Exception as e:
             final_answer = f"Error generating content: {e}"
     else:
-        final_answer = "Error: Gemini API Key is missing."
+        final_answer = "Error: Groq API Key is missing."
     
     save_to_memory(user_prompt, final_answer)
     return final_answer
 
-# --- টেলিগ্রাম বটের কমান্ড এবং মেসেজ হ্যান্ডলার ---
-
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
-    bot.reply_to(message, "হ্যালো! আমি আপনার পার্সোনাল এআই এজেন্ট। আমাকে যেকোনো কিছু জিজ্ঞাসা করতে পারেন।")
+    bot.reply_to(message, "হ্যালো! আমি আপনার সুপারফাস্ট Groq AI (Llama-3) এজেন্ট। আমাকে যেকোনো কিছু জিজ্ঞাসা করতে পারেন।")
 
 @bot.message_handler(func=lambda message: True)
 def handle_user_message(message):
-    # ইউজারকে জানানো হচ্ছে যে বট কাজ করছে
-    processing_msg = bot.reply_to(message, "⏳ তথ্য খুঁজছি এবং চিন্তা করছি...")
-    
-    # এজেন্টের মাধ্যমে উত্তর তৈরি করা
+    processing_msg = bot.reply_to(message, "⚡ দ্রুত তথ্য খুঁজছি...")
     answer = run_agent(message.text)
-    
-    # উত্তরটি পাঠানো
-    bot.edit_message_text(chat_id=message.chat.id, message_id=processing_msg.message_id, text=answer)
-
+    try:
+        bot.edit_message_text(chat_id=message.chat.id, message_id=processing_msg.message_id, text=answer)
+    except Exception:
+        bot.send_message(message.chat.id, answer)
 
 if __name__ == "__main__":
     print("Starting Web Server...")
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.start()
     
-    print("Starting Telegram Bot...")
+    print("Starting Telegram Bot with Groq...")
     bot.infinity_polling()
