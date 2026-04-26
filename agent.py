@@ -8,7 +8,6 @@ from ddgs import DDGS
 from dotenv import load_dotenv
 import telebot
 
-# Environment Variables Load
 load_dotenv()
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -16,22 +15,10 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-# --- Error Checking ---
-if not TELEGRAM_BOT_TOKEN:
-    print("\n" + "="*50)
-    print("❌ ERROR: TELEGRAM_BOT_TOKEN is missing in Render!")
-    print("Please add TELEGRAM_BOT_TOKEN in Environment Variables.")
-    print("="*50 + "\n")
+if not TELEGRAM_BOT_TOKEN or not GROQ_API_KEY:
+    print("❌ ERROR: Required API Keys are missing in Render Environment!")
     sys.exit(1)
 
-if not GROQ_API_KEY:
-    print("\n" + "="*50)
-    print("❌ ERROR: GROQ_API_KEY is missing in Render!")
-    print("Please add GROQ_API_KEY in Environment Variables.")
-    print("="*50 + "\n")
-    sys.exit(1)
-
-# Initialize Clients
 groq_client = Groq(api_key=GROQ_API_KEY)
 if SUPABASE_URL and SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -39,11 +26,11 @@ else:
     supabase = None
 
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
-
 app = Flask(__name__)
+
 @app.route('/')
 def home():
-    return "Llama-3 Agent is Running super fast with Groq!"
+    return "Llama-3.3 Agent is Live!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -73,7 +60,8 @@ def run_agent(user_prompt):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            model="llama3-70b-8192",
+            # এখানে লেটেস্ট মডেলটি বসানো হয়েছে
+            model="llama-3.3-70b-versatile",
             temperature=0.5,
         )
         final_answer = chat_completion.choices[0].message.content
@@ -85,7 +73,7 @@ def run_agent(user_prompt):
 
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
-    bot.reply_to(message, "হ্যালো! আমি আপনার সুপারফাস্ট Groq AI (Llama-3) এজেন্ট।")
+    bot.reply_to(message, "হ্যালো! আমি আপনার সুপারফাস্ট Groq AI (Llama-3.3) এজেন্ট।")
 
 @bot.message_handler(func=lambda message: True)
 def handle_user_message(message):
@@ -97,12 +85,7 @@ def handle_user_message(message):
         bot.send_message(message.chat.id, answer)
 
 if __name__ == "__main__":
-    print("Starting Web Server...")
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.start()
-    
-    print("Starting Telegram Bot with Groq...")
-    try:
-        bot.infinity_polling()
-    except Exception as e:
-        print(f"\n❌ Telegram Bot Error: {e}\n")
+    print("Starting Telegram Bot with Latest Llama-3.3...")
+    bot.infinity_polling()
