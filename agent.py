@@ -4,22 +4,22 @@ from supabase import create_client, Client
 from duckduckgo_search import DDGS
 from dotenv import load_dotenv
 
-ে
+# Load Environment Variables
 load_dotenv()
 
-# এপিআই কীগুলো (API Keys) সেটআপ করা
+# Setup API Keys
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-# ক্লায়েন্ট ইনিশিয়ালাইজ করা
+# Initialize Clients
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 if SUPABASE_URL and SUPABASE_KEY:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def web_search_tool(query):
-    """ইন্টারনেট থেকে সম্পূর্ণ ফ্রিতে ডেটা খুঁজে বের করার টুল"""
+    """Free Web Search using DuckDuckGo"""
     print(f"Searching internet for: {query}...")
     try:
         results = DDGS().text(query, max_results=3)
@@ -32,7 +32,7 @@ def web_search_tool(query):
         return "No recent data found."
 
 def save_to_memory(user_input, bot_output):
-    """Supabase ডাটাবেসে কথোপকথন সেভ রাখা"""
+    """Save to Supabase Database"""
     if not SUPABASE_URL or not SUPABASE_KEY:
         print("Supabase keys missing. Skipping memory save.")
         return
@@ -48,7 +48,7 @@ def save_to_memory(user_input, bot_output):
         print(f"Memory saving failed: {e}")
 
 def run_agent(user_prompt):
-    """এজেন্টের মূল লজিক"""
+    """Main Agent Logic"""
     context = web_search_tool(user_prompt)
     
     model = genai.GenerativeModel('gemini-1.5-flash')
