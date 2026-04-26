@@ -4,3 +4,5 @@ ddgs
 python-dotenv
 pyTelegramBotAPI
 flask
+beautifulsoup4
+requests
