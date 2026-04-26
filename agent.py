@@ -69,9 +69,9 @@ def run_agent(user_prompt):
     print("Agent is generating response...")
     if gemini_client:
         try:
-            # গুগলের নতুন মডেল gemini-2.5-flash ব্যবহার করা হচ্ছে
+            # গুগলের লেটেস্ট মডেল gemini-2.0-flash ব্যবহার করা হচ্ছে
             response = gemini_client.models.generate_content(
-                model='gemini-2.5-flash',
+                model='gemini-2.0-flash',
                 contents=full_prompt
             )
             final_answer = response.text
