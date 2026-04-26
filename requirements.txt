@@ -1,5 +1,4 @@
-
 google-generativeai
 supabase
-apify-client
+duckduckgo-search
 python-dotenv
